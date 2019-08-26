@@ -1,10 +1,17 @@
-module Proj1 (Pitch, toPitch, feedback, removeJust, compareNote, compareOctave, Octave, Note) where
+module Proj1 (Pitch, toPitch, removeJust, compareNote, compareOctave, Octave, Note, feedback, GameState) where
 import Data.Maybe
 import Data.List
 
-data Octave = One | Two | Three deriving (Read, Eq)
-data Note = A | B | C | D | E | F | G deriving (Show, Read, Eq)
+data Octave = One | Two | Three deriving (Read, Eq, Enum, Bounded)
+data Note = A | B | C | D | E | F | G deriving (Show, Read, Eq, Enum, Bounded)
 data Pitch = Pitch Note Octave deriving (Read, Eq)
+data GameState = GameState { attempted ::[[Pitch]]
+                           , remaining :: [[Pitch]]
+} deriving Show
+
+-- A collection of all possible pitchs
+type CombinationByNote = [[Pitch]]
+
 
 -- Show instance for Octave. Convert ocatve to String
 instance Show Octave where
@@ -56,12 +63,6 @@ getOctave (Pitch _ o) = o
 removeJust :: [Maybe Pitch] -> [Pitch]
 removeJust = map fromJust
 
-
--- comparePitch :: Pitch -> Pitch -> Bool
--- comparePitch p1 p2
---     | getNote p1 == getNote p2 && getOctave p1 == getOctave p2 = True
---     | otherwise = False
-
 -- function to compare if two pitchs have the same note but different octave
 compareNote :: Pitch -> Pitch -> Bool
 compareNote p1 p2 
@@ -74,11 +75,20 @@ compareOctave p1 p2
     | (getNote p1 /= getNote p2) && (getOctave p1 == getOctave p2) = True
     | otherwise = False
 
--- countEq :: [a] -> [a] -> (a -> a -> Bool) -> Int
--- countEq [] _ _ = 0
--- countEq _ [] _ = 0
--- countEq (x:xs) (y:ys) func
---    | func x y = 1 + countEq xs ys func
---    | otherwise = 0 + countEq xs ys func
+feedback :: [Pitch] -> [Pitch] -> (Int, Int, Int)
+feedback guess target = (length intersection, 
+                         length (intersectBy compareNote uniqueTarget uniqueGuess),
+                         length (intersectBy compareOctave uniqueTarget uniqueGuess))
+    where intersection = guess `intersect` target 
+          uniqueTarget = target \\ intersection
+          uniqueGuess = guess \\ intersection
 
--- feedback :: [Pitch] -> [Pitch] -> (Int, Int, Int)
+--
+
+generateInput :: [String] -> [Pitch]
+generateInput input = removeJust (map toPitch input)
+
+genComByNote :: CombinationByNote
+genComByNote = groupBy compareNote [Pitch note octave |
+                                         note <- [A .. G], 
+                                         octave <- [One .. Three]]
