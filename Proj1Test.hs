@@ -70,6 +70,7 @@ main = do
 --   is guessed.
 loop :: Selection -> Selection -> GameState -> Int -> IO ()
 loop answer guess other guesses = do
+    putStrLn $ "answer " ++ show answer
     putStrLn $ "Your guess " ++ show guesses ++ ":  " ++ show guess
     putStrLn $ "Your state " ++ (show other)
     if validSelection guess && length answer == length guess then do
