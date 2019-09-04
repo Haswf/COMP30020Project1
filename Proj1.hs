@@ -124,6 +124,7 @@ filterOutSuit (thisGuess, rightleft, (exactMatch, smaller, equal,greater,matchSu
     let newrightleft
             -- if no card in current guess has same suit as targets, filter out cards with same suit as this guess
             | matchSuit == 0 = Data.List.foldr (\card acc -> if getSuit card `elem` thisSuit then acc else card:acc) [] rightleft
+            | matchSuit == length thisGuess = Data.List.foldr (\card acc -> if getSuit card `elem` thisSuit then card:acc else acc) [] rightleft
             -- -- if majority of this guess have the right suit, 
             -- | let halfLengt = matchSuit > div (length thisGuess) 2 = 
             --     Data.List.foldr (\card acc -> if getSuit card == listMode thisSuit then card:acc else acc) [] rightleft
