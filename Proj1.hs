@@ -28,7 +28,7 @@ feedback answer guess = (length exactMatch,
           lowerRank = Data.List.filter (<lowestRank) answerRank
           equalRank = answerRank `intersect` guessRank
           greaterRank = Data.List.filter (>highestRank) answerRank
-          equalSuit =  Data.List.map getSuit guess `intersect` Data.List.map getSuit answer
+          equalSuit =  Data.List.map getSuit answer `intersect` Data.List.map getSuit guess
 
 -- helper function to extract rank of a card
 getRank :: Card -> Rank
@@ -74,9 +74,11 @@ nextGuess (thisGuess, thisGameState) fb
     | otherwise = findCorrect (thisGuess, thisGameState) fb
     where answerLen = length thisGuess
 
+extractRightLeft :: ([Card],[Card], Feedback) -> [Card]
+extractRightLeft (_, newrightleft, _) = newrightleft
 
 findCorrect :: ([Card],GameState) -> Feedback -> ([Card],GameState)
-findCorrect (thisGuess, GameState wrongLeft rightleft wrongguess correctguess) (exactMatch, smaller, _,greater,_) = 
+findCorrect (thisGuess, GameState wrongLeft rightleft wrongguess correctguess) (exactMatch, smaller, equal,greater,matchSuit) = 
     let guessRank = Data.List.map getRank thisGuess
         lowestRank = minimum guessRank
         highestRank = maximum guessRank
@@ -85,9 +87,7 @@ findCorrect (thisGuess, GameState wrongLeft rightleft wrongguess correctguess) (
 
         newrightleft
             | length newCorrectGuess == ansLength = toList correctguess
-            | smaller == 0 = Data.List.foldr (\card acc-> if getRank card <lowestRank then acc else card:acc) [] rightleft 
-            | greater == 0 = Data.List.foldr (\card acc-> if getRank card >highestRank then acc else card:acc) [] rightleft 
-            | otherwise = rightleft
+            | otherwise = extractRightLeft (filterOutSuit $ filterOutGreater $ filterOutSmaller (thisGuess, rightleft, (exactMatch, smaller, equal ,greater,matchSuit))) 
 
         newGuess = twoWrongCards ++ [head newrightleft]
 
@@ -99,3 +99,38 @@ findCorrect (thisGuess, GameState wrongLeft rightleft wrongguess correctguess) (
     in (newGuess, newGameState)
     where ansLength = length thisGuess
           twoWrongCards = take (ansLength-1) wrongguess
+
+-- filter out card in Rightleft which is greater than maximum card in this guess.
+filterOutGreater ::  ([Card],[Card], Feedback) -> ([Card],[Card], Feedback) 
+filterOutGreater (thisGuess, rightleft, (exactMatch, smaller, equal,greater,matchSuit)) = 
+    let guessRank = Data.List.map getRank thisGuess
+        highestRank = maximum guessRank
+        newrightleft 
+            | greater == 0 = Data.List.foldr (\card acc-> if getRank card >highestRank then acc else card:acc) [] rightleft 
+            | otherwise = rightleft
+        in (thisGuess, newrightleft, (exactMatch, smaller, equal,greater,matchSuit))
+
+filterOutSmaller ::  ([Card],[Card], Feedback) -> ([Card],[Card], Feedback) 
+filterOutSmaller (thisGuess, rightleft, (exactMatch, smaller, equal,greater,matchSuit)) = 
+    let guessRank = Data.List.map getRank thisGuess
+        lowestRank = minimum guessRank
+        newrightleft 
+            | smaller == 0 = Data.List.foldr (\card acc-> if getRank card <lowestRank then acc else card:acc) [] rightleft
+            | otherwise = rightleft
+        in (thisGuess, newrightleft, (exactMatch, smaller, equal,greater,matchSuit))
+
+filterOutSuit :: ([Card],[Card], Feedback) -> ([Card],[Card], Feedback) 
+filterOutSuit (thisGuess, rightleft, (exactMatch, smaller, equal,greater,matchSuit))  = 
+    let newrightleft
+            -- if no card in current guess has same suit as targets, filter out cards with same suit as this guess
+            | matchSuit == 0 = Data.List.foldr (\card acc -> if getSuit card `elem` thisSuit then acc else card:acc) [] rightleft
+            -- -- if majority of this guess have the right suit, 
+            -- | let halfLengt = matchSuit > div (length thisGuess) 2 = 
+            --     Data.List.foldr (\card acc -> if getSuit card == listMode thisSuit then card:acc else acc) [] rightleft
+            | otherwise = rightleft
+            where thisSuit = Data.List.map getSuit thisGuess 
+
+        in (thisGuess, newrightleft,  (exactMatch, smaller, equal,greater,matchSuit))
+
+listMode :: Ord a => [a] -> a
+listMode = snd . maximum . Data.List.map (\xs -> (length xs, head xs)) . group . sort
