@@ -5,15 +5,18 @@ import Card
 import Data.List
 import Data.Set
 
+
 type Feedback = (Int, Int, Int, Int, Int)
 
+-- GameState is a type used to store game information across multiple guesses.
 data GameState = GameState{
-                        wrongLeft :: [Card], -- cards that haven't been test for incorrect
-                        rightLeft :: [Card], -- cards that haven't been test for corect
-                        wrongGuess :: [Card], -- A set of cards which have been tested to be incorrect
-                        correctGuess :: Set Card
+                        mismatchLeft :: [Card], -- cards that haven't been test for incorrect
+                        matchLeft :: [Card], -- cards that haven't been test for corect
+                        mismatchCard :: [Card], -- A set of cards which have been tested to be incorrect
+                        matchCard :: Set Card   -- 
                         } deriving (Show)
 
+-- Provide feedback on the answer and the guess
 feedback :: [Card] -> [Card] -> Feedback
 feedback answer guess = (length exactMatch,
                          length lowerRank,
@@ -38,100 +41,117 @@ getRank (Card _ r) = r
 getSuit :: Card -> Suit
 getSuit (Card s _) = s
 
+-- Create an inisital card based on a given numberOfCardsber of cards
 initialGuess :: Int -> ([Card], GameState)
-initialGuess num = (guess, gamestate)
-    where guess = take num allCards
-          gamestate = GameState { wrongLeft=allCards Data.List.\\ guess, 
-                                  rightLeft=allCards, 
-                                  wrongGuess=[], 
-                                  correctGuess=empty}
+initialGuess numberOfCards = (guess, gamestate)
+    where guess = take numberOfCards allCards -- take first N cards as first guess where N is the numberOfCardsber of cards to guess
+          gamestate = GameState { mismatchLeft=allCards Data.List.\\ guess,
+                                  matchLeft=allCards, 
+                                  mismatchCard=[], 
+                                  matchCard=empty
+                                }
           -- all cards in card type
           allCards = [minBound..maxBound] :: [Card]
 
-findWrong :: ([Card], GameState) -> Feedback -> ([Card], GameState)
-findWrong (thisGuess, GameState wrongLeft rightleft wrongguess correctguess) (exactMatch, _, _,_,_) = 
-    let newWrongLeft 
+guessMismatchCard :: ([Card], GameState) -> Feedback -> ([Card], GameState)
+guessMismatchCard (thisGuess, GameState mismatchLeft matchLeft mismatchCard matchCard)
+          (exactMatch, _, _,_,_) =      -- at this stage, we don't care other feedback
+        -- build new mismatchLeft
+    let newmismatchLeft 
             | exactMatch == 0 = []
-            | otherwise = tail wrongLeft
-        newRightLeft 
-            | exactMatch == 0 = rightleft Data.List.\\ thisGuess
-            | otherwise = rightleft
-        newWrongGuess 
+            | otherwise = tail mismatchLeft
+        -- build new matchLeft
+        newmatchLeft 
+            -- if no card in this guess matches target, remove them from matchLeft
+            | exactMatch == 0 = matchLeft Data.List.\\ thisGuess
+            | otherwise = matchLeft
+        -- build new mismatchCard
+        newmismatchCard 
+            -- if no card in this guess matches target, add them to mistmatchCard
             | exactMatch == 0 = thisGuess
-            | otherwise = wrongguess
-        newGameState = GameState {  wrongLeft=newWrongLeft, -- found enough wrong cards, no longer need to keep cards haven't been tested to be wrong
-                                    rightLeft=newRightLeft, -- no need to change right left
-                                    wrongGuess=newWrongGuess, -- store wrong cards in wrong guess
-                                    correctGuess=empty}
-        newGuess = tail thisGuess ++ [head wrongLeft]
+            | otherwise = mismatchCard
+        -- Construct new GameState
+        newGameState = GameState {  mismatchLeft=newmismatchLeft,
+                                    matchLeft=newmatchLeft,
+                                    mismatchCard=newmismatchCard,
+                                    matchCard=matchCard}
+        -- append first card in mismatchLeft to form next guess
+        newGuess = tail thisGuess ++ [head mismatchLeft]
     in (newGuess, newGameState)
-        
+
+-- Generate next guess based on GameState and Feedback of previous guess
 nextGuess :: ([Card],GameState) -> Feedback -> ([Card],GameState)
 nextGuess (thisGuess, thisGameState) fb
-    -- if we haven't found length card distinct cards that's not in target
-    | length (correctGuess thisGameState) == answerLen = (toList (correctGuess thisGameState), thisGameState)
-    | length (wrongGuess thisGameState) /= answerLen = findWrong (thisGuess, thisGameState) fb
-    | otherwise = findCorrect (thisGuess, thisGameState) fb
-    where answerLen = length thisGuess
+    -- if all cards in target were added to matchCard 
+    | length (matchCard thisGameState) == answerLen = (toList (matchCard thisGameState), thisGameState)
+    -- if we don't have enough mismatch ard in mismatchCard, keep finding mismatched cards.
+    | length (mismatchCard thisGameState) /= answerLen = guessMismatchCard (thisGuess, thisGameState) fb
+    -- otherwise, keep looking for matched cards.
+    | otherwise = guessMatchCard (thisGuess, thisGameState) fb
+    where answerLen = length thisGuess -- the length of target cards
 
-extractRightLeft :: ([Card],[Card], Feedback) -> [Card]
-extractRightLeft (_, newrightleft, _) = newrightleft
 
-findCorrect :: ([Card],GameState) -> Feedback -> ([Card],GameState)
-findCorrect (thisGuess, GameState wrongLeft rightleft wrongguess correctguess) (exactMatch, smaller, equal,greater,matchSuit) = 
-    let guessRank = Data.List.map getRank thisGuess
-        lowestRank = minimum guessRank
-        highestRank = maximum guessRank
-        newCorrectGuess = case exactMatch of 0 -> correctguess
-                                             1 -> Data.Set.insert (last thisGuess) correctguess
+guessMatchCard :: ([Card],GameState) -> Feedback -> ([Card],GameState)
+guessMatchCard (thisGuess, GameState mismatchLeft matchLeft mismatchCard matchCard) (exactMatch, smaller, equal,greater,matchSuit) = 
+    let newmatchCard = case exactMatch of 0 -> matchCard
+                                          1 -> Data.Set.insert (last thisGuess) matchCard
 
-        newrightleft
-            | length newCorrectGuess == ansLength = toList correctguess
-            | otherwise = extractRightLeft (filterOutSuit $ filterOutGreater $ filterOutSmaller (thisGuess, rightleft, (exactMatch, smaller, equal ,greater,matchSuit))) 
+        newmatchLeft
+            | length newmatchCard == ansLength = toList matchCard
+            | otherwise = extractmatchLeft (filterOutSuit $ filterOutGreater $ filterOutSmaller (thisGuess, matchLeft, (exactMatch, smaller, equal ,greater,matchSuit))) 
 
-        newGuess = twoWrongCards ++ [head newrightleft]
+        newGuess = twoWrongCards ++ [head newmatchLeft]
 
-        newGameState = GameState {  wrongLeft=[],
-                                    rightLeft=tail newrightleft, -- no need to change right left
-                                    wrongGuess=wrongguess,
-                                    correctGuess=newCorrectGuess}
+        newGameState = GameState {  mismatchLeft=[],
+                                    matchLeft=tail newmatchLeft, -- no need to change right left
+                                    mismatchCard=mismatchCard,
+                                    matchCard=newmatchCard}
 
     in (newGuess, newGameState)
     where ansLength = length thisGuess
-          twoWrongCards = take (ansLength-1) wrongguess
+          twoWrongCards = take (ansLength-1) mismatchCard
 
--- filter out card in Rightleft which is greater than maximum card in this guess.
+-- Extract newmatchLeft from intermediate tuple for filters.
+extractmatchLeft :: ([Card],[Card], Feedback) -> [Card]
+extractmatchLeft (_, newmatchLeft, _) = newmatchLeft
+
+-- filter out cards in matchLeft which have greater rank than maximum card in this guess.
 filterOutGreater ::  ([Card],[Card], Feedback) -> ([Card],[Card], Feedback) 
-filterOutGreater (thisGuess, rightleft, (exactMatch, smaller, equal,greater,matchSuit)) = 
+filterOutGreater (thisGuess, matchLeft, (exactMatch, smaller, equal,greater,matchSuit)) = 
+    -- Extract ranks of all cards to a list
     let guessRank = Data.List.map getRank thisGuess
+        -- Find the Highest rank in the guess
         highestRank = maximum guessRank
-        newrightleft 
-            | greater == 0 = Data.List.foldr (\card acc-> if getRank card >highestRank then acc else card:acc) [] rightleft 
-            | otherwise = rightleft
-        in (thisGuess, newrightleft, (exactMatch, smaller, equal,greater,matchSuit))
+        newmatchLeft 
+            | greater == 0 = Data.List.foldr (\card acc-> if getRank card >highestRank then acc else card:acc) [] matchLeft 
+            | otherwise = matchLeft
+        in (thisGuess, newmatchLeft, (exactMatch, smaller, equal,greater,matchSuit))
 
+-- filter out cards in matchLeft which have smaller rank than minimum card in this guess.
 filterOutSmaller ::  ([Card],[Card], Feedback) -> ([Card],[Card], Feedback) 
-filterOutSmaller (thisGuess, rightleft, (exactMatch, smaller, equal,greater,matchSuit)) = 
+filterOutSmaller (thisGuess, matchLeft, (exactMatch, smaller, equal,greater,matchSuit)) = 
+        -- Extract ranks of all cards to a list
     let guessRank = Data.List.map getRank thisGuess
+        -- Find the lowest rank in the guess
         lowestRank = minimum guessRank
-        newrightleft 
-            | smaller == 0 = Data.List.foldr (\card acc-> if getRank card <lowestRank then acc else card:acc) [] rightleft
-            | otherwise = rightleft
-        in (thisGuess, newrightleft, (exactMatch, smaller, equal,greater,matchSuit))
+        -- Build new matchLeft
+        newmatchLeft 
+            -- No card in guess has lower tank than the lowest rank in the guess, filter out cards with enen lower rank in matchLeft.
+            | smaller == 0 = Data.List.foldr (\card acc-> if getRank card <lowestRank then acc else card:acc) [] matchLeft
+            -- Otherwise, keep matchLeft as it is.
+            | otherwise = matchLeft
+        in (thisGuess, newmatchLeft, (exactMatch, smaller, equal,greater,matchSuit))
 
 filterOutSuit :: ([Card],[Card], Feedback) -> ([Card],[Card], Feedback) 
-filterOutSuit (thisGuess, rightleft, (exactMatch, smaller, equal,greater,matchSuit))  = 
-    let newrightleft
-            -- if no card in current guess has same suit as targets, filter out cards with same suit as this guess
-            | matchSuit == 0 = Data.List.foldr (\card acc -> if getSuit card `elem` thisSuit then acc else card:acc) [] rightleft
-            | matchSuit == length thisGuess = Data.List.foldr (\card acc -> if getSuit card `elem` thisSuit then card:acc else acc) [] rightleft
-            -- -- if majority of this guess have the right suit, 
-            -- | let halfLengt = matchSuit > div (length thisGuess) 2 = 
-            --     Data.List.foldr (\card acc -> if getSuit card == listMode thisSuit then card:acc else acc) [] rightleft
-            | otherwise = rightleft
-            where thisSuit = Data.List.map getSuit thisGuess 
+filterOutSuit (thisGuess, matchLeft, (exactMatch, smaller, equal,greater,matchSuit))  = 
+    let newmatchLeft
+            -- if no card in the current guess has same suit as targets, filter out cards in matchLeft with same suit.
+            | matchSuit == 0 = Data.List.foldr (\card acc -> if getSuit card `elem` suits then acc else card:acc) [] matchLeft
+            -- if all cards in the current guess has same suit as targets, filter out cards in matchLeft with different suit.
+            | matchSuit == length thisGuess = Data.List.foldr (\card acc -> if getSuit card `elem` suits then card:acc else acc) [] matchLeft
+            -- Otherwise, keep matchLeft as it is.
+            | otherwise = matchLeft
+            -- Extract suits of all cards to a list
+            where suits = Data.List.map getSuit thisGuess 
 
-        in (thisGuess, newrightleft,  (exactMatch, smaller, equal,greater,matchSuit))
-
-listMode :: Ord a => [a] -> a
-listMode = snd . maximum . Data.List.map (\xs -> (length xs, head xs)) . group . sort
+        in (thisGuess, newmatchLeft,  (exactMatch, smaller, equal,greater,matchSuit))
