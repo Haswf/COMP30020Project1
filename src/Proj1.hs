@@ -1,6 +1,19 @@
--- Solution to COMP30020 Project 1 2019S2
--- @author Shuyang Fan shuyangf(AT)student.unimelb.edu.au
- 
+--  File     : Proj1.hs
+--  Author   : Shuyang Fan <shuyangf@student.unimelb.edu.au>
+--  Purpose  : Solution to COMP30020 Project 1 2019S2
+--  Description : 
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+--
+
 module Proj1 (feedback, initialGuess, nextGuess, GameState) where
     
 import Card
@@ -13,9 +26,10 @@ type Feedback = (Int, Int, Int, Int, Int)
 --   the remaining possible card combiantions.
 type GameState = [[Card]]
 
--- | Provides five numbers feedback on how the guess differs/similars from the answer, which are
---   correct cards, lower ranks, correct ranks, higher ranks and correct suits.
---   It takes a list cards as answer and a list of cards as guess, returns a Feedback as define above.
+-- | Return five numbers feedback on how the guess differs/similars from the 
+--   answer, which are correct cards, lower ranks, correct ranks, higher ranks 
+--   and correct suits. It takes a list cards as answer and a list of cards as 
+--   guess, returns a Feedback as define above.
 feedback :: [Card] -> [Card] -> Feedback
 feedback answer guess = (length correctCards,
                          length lowerRank,
@@ -23,22 +37,20 @@ feedback answer guess = (length correctCards,
                          length higherRank,
                          length sameSuit)
     where correctCards = answer `intersect` guess
-          -- Ranks of cards in guess.
           guessRank = map getRank guess
-          -- Ranks of cards in answer.
           answerRank = map getRank answer
-          -- Filter the cards in the answer that has a lower rank than the card with the lowest rank in guess.          
-          lowerRank = let lowestRank = minimum guessRank 
-                        in filter (<lowestRank) answerRank
-        
-          -- Filter out the cards in the answer that has the same rank as a card in the guess.          
           sameRank = answerRank `intersect` guessRank
+          sameSuit = map getSuit answer `intersect` map getSuit guess
 
-          -- Filter out the cards in the answer that has a higher rank than the card with the lowest rank in guess.          
+          -- Filter the cards in the answer that has a lower rank than the card 
+          -- with the lowest rank in guess.          
+          lowerRank = let lowestRank = minimum guessRank 
+                        in filter (<lowestRank) answerRank    
+
+          -- Filter out the cards in the answer that has a higher rank than the 
+          -- card with the lowest rank in guess.          
           higherRank = let highestRank = maximum guessRank 
                             in filter (>highestRank) answerRank
-          -- Suits that appear the same time in answer and guess.
-          sameSuit = map getSuit answer `intersect` map getSuit guess
 
 -- | Helper function to extract the rank of a card.
 --   getRank takes a Card type and extract its rank by pattern matching.
@@ -54,11 +66,11 @@ getSuit (Card s _) = s
 --   representing number of cards in answer.
 initialGuess :: Int -> ([Card],GameState)
 initialGuess guessLen = (goodStart, allCombinations)
-        -- Generate initial guess based on the number of cards. See generateInitialGuess.
+        -- Generate initial guess based on the number of cards. 
+        -- See generateInitialGuess.
     where goodStart = generateInitialGuess guessLen
         -- All cards in a deck.
           allCards = [minBound..maxBound] :: [Card]
-        -- Combinations is called to generation all combination of length guessLen.
           allCombinations = combinations guessLen allCards
 
 -- | Return middle element of a list. 
@@ -73,37 +85,36 @@ getMiddle lst = lst !! midIndex
 --   the top and bottom ranks. This was achieved by chunk rank into
 --   13 / guessLen sections and extract the middle element of each trunk.
 generateInitialGuess :: Int -> [Card]
-generateInitialGuess guessLen = let suits = take guessLen [minBound..maxBound] :: [Suit]
-                                    -- number of chunks
-                                    chunks = 13 `div` guessLen
-                                    -- Get middle element of each chunk
-                                    ranks = map getMiddle $ chunksOf chunks [minBound..maxBound] :: [Rank]
-                            -- Create cards using Card constructor
-                            in zipWith Card suits ranks 
+generateInitialGuess guessLen = let 
+        suits = take guessLen [minBound..maxBound] :: [Suit]
+        chunks = 13 `div` guessLen -- number of chunks
+        ranks = map getMiddle $ chunksOf chunks [minBound..maxBound] :: [Rank]
+        in zipWith Card suits ranks 
 
 -- | Split a list into chunks of size n. 
--- | It takes a Int representing chunk size and a list to be splited as arguments.
--- | The list will be returned as it is if it has less elements than N.
+-- It takes a Int representing chunk size and a list to be splited as
+-- arguments. The list will be returned as it is if it has less elements than N.
 chunksOf :: Int -> [a] -> [[a]]
 chunksOf chunkLength lst
   | length lst >= chunkLength = take chunkLength lst: chunksOf chunkLength rest
   | otherwise = [lst]
   where rest = drop chunkLength lst
 
+  
 
-                            
-
--- | Generates the combinations of K distinct objects chosen from the N elements of a list
--- using list comprehension recursively.
---   It takes an Int indicating the number of elements each combination will have and a list.
+-- | Generates the combinations of K distinct objects chosen from the N
+--   elements of a list using list comprehension recursively.
+--   It takes an Int indicating the number of elements each combination will
+--   have and a list.
 combinations :: Int -> [a] -> [[a]]
 combinations 0 _  = [[]]
 combinations n lst = [y:ys | y:rest <- tails lst, 
                                ys <- combinations (n-1) rest]
 
--- | Return a new ([Card], GameState) pair representing next guess and new GameState 
---   based on the feedback on previous guess. It takes a ([Card], GameState) pair 
---   representing previous guess and GameState and Feedback on the previous guess.
+-- | Return a new ([Card], GameState) pair representing next guess and new
+--   GameState based on the feedback on previous guess. It takes a ([Card], 
+--   GameState) pair representing previous guess and GameState and Feedback on 
+--   the previous guess.
 nextGuess :: ([Card],GameState) -> Feedback -> ([Card],GameState)
 nextGuess (guess, gameState) fb = (head newGameState, newGameState)
     -- Narrows down possible answers by only keeping card combiantions 
