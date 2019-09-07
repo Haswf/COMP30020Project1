@@ -93,7 +93,8 @@ chunksOf chunkLength lst
 
                             
 
--- | Generates the combinations of K distinct objects chosen from the N elements of a list.
+-- | Generates the combinations of K distinct objects chosen from the N elements of a list
+-- using list comprehension recursively.
 --   It takes an Int indicating the number of elements each combination will have and a list.
 combinations :: Int -> [a] -> [[a]]
 combinations 0 _  = [[]]
